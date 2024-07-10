@@ -13,7 +13,7 @@ var _ Widget = &StyleSetter{}
 type StyleSetter struct {
 	colors   map[StyleColorID]color.Color
 	styles   map[StyleVarID]any
-	font     *FontInfo
+	fonts    []*FontInfo
 	disabled bool
 	layout   Layout
 
@@ -52,7 +52,7 @@ func (ss *StyleSetter) SetStyleFloat(varID StyleVarID, value float32) *StyleSett
 
 // SetFont sets font.
 func (ss *StyleSetter) SetFont(font *FontInfo) *StyleSetter {
-	ss.font = font
+	ss.fonts = []*FontInfo{font}
 	return ss
 }
 
@@ -61,13 +61,19 @@ func (ss *StyleSetter) SetFont(font *FontInfo) *StyleSetter {
 // each font's size.
 func (ss *StyleSetter) SetFontSize(size float32) *StyleSetter {
 	var font FontInfo
-	if ss.font != nil {
-		font = *ss.font
+	if ss.fonts != nil {
+		// If the font has been set, just set its size.
+		font = *ss.fonts[0]
+		ss.fonts[0] = font.SetSize(size)
 	} else {
-		font = Context.FontAtlas.defaultFonts[0]
-	}
+		// If the font has not been set, set size to all default fonts.
+		//font = Context.FontAtlas.defaultFonts[0]
+		//ss.font = font.SetSize(size)
 
-	ss.font = font.SetSize(size)
+		for _, f := range Context.FontAtlas.defaultFonts {
+			ss.fonts = append(ss.fonts, f.SetSize(size))
+		}
+	}
 
 	return ss
 }
@@ -177,9 +183,12 @@ func (ss *StyleSetter) Push() {
 		}
 	}
 
-	// push font
-	if ss.font != nil {
-		ss.isFontPushed = PushFont(ss.font)
+	// push fonts
+	if ss.fonts != nil {
+		//ss.isFontPushed = PushFont(ss.font)
+		for _, font := range ss.fonts {
+			ss.isFontPushed = PushFont(font)
+		}
 	}
 
 	if ss.disabled {
@@ -190,7 +199,9 @@ func (ss *StyleSetter) Push() {
 // Pop allows to manually pop the whole StyleSetter (use after Push!)
 func (ss *StyleSetter) Pop() {
 	if ss.isFontPushed {
-		imgui.PopFont()
+		for range ss.fonts {
+			imgui.PopFont()
+		}
 	}
 
 	if ss.disabled {
