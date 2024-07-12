@@ -1,6 +1,7 @@
 package giu
 
 import (
+	"fmt"
 	"image/color"
 
 	imgui "github.com/AllenDang/cimgui-go"
@@ -16,6 +17,9 @@ type StyleSetter struct {
 	font     *FontInfo
 	disabled bool
 	layout   Layout
+
+	sizeBackups []float32
+	fontSize    float32
 
 	// set by imgui.PushFont inside ss.Push() method
 	isFontPushed bool
@@ -63,11 +67,20 @@ func (ss *StyleSetter) SetFontSize(size float32) *StyleSetter {
 	var font FontInfo
 	if ss.font != nil {
 		font = *ss.font
+		ss.font = font.SetSize(size)
 	} else {
-		font = Context.FontAtlas.defaultFonts[0]
-	}
+		// font = Context.FontAtlas.defaultFonts[0]
 
-	ss.font = font.SetSize(size)
+		ss.sizeBackups = []float32{}
+
+		for _, font := range Context.FontAtlas.GetDefaultFonts() {
+			ss.sizeBackups = append(ss.sizeBackups, font.size)
+		}
+
+		fmt.Println("Backing up fonts!")
+		fmt.Println()
+		ss.fontSize = size
+	}
 
 	return ss
 }
@@ -180,6 +193,20 @@ func (ss *StyleSetter) Push() {
 	// push font
 	if ss.font != nil {
 		ss.isFontPushed = PushFont(ss.font)
+	} else {
+		fmt.Println("Pushing styles")
+		fmt.Println(ss.fontSize)
+		fmt.Println()
+		// We have to scale the default fonts.
+		for i, font := range Context.FontAtlas.GetDefaultFonts() {
+			if ss.fontSize != 0 {
+				//Context.FontAtlas.defaultFonts[i] = *font.SetSize(ss.fontSize)
+				Context.FontAtlas.defaultFonts[i].size = ss.fontSize
+			} else {
+				//Context.FontAtlas.defaultFonts[i] = *font.SetSize(Context.FontAtlas.fontSize)
+				Context.FontAtlas.defaultFonts[i].size = Context.FontAtlas.fontSize
+			}
+		}
 	}
 
 	if ss.disabled {
@@ -191,6 +218,21 @@ func (ss *StyleSetter) Push() {
 func (ss *StyleSetter) Pop() {
 	if ss.isFontPushed {
 		imgui.PopFont()
+	}
+
+	if ss.sizeBackups != nil {
+		fmt.Println("Popping styles")
+		fmt.Print(ss.sizeBackups)
+		fmt.Println()
+		for i, size := range ss.sizeBackups {
+			if size != 0 {
+				Context.FontAtlas.defaultFonts[i] = *Context.FontAtlas.defaultFonts[i].SetSize(size)
+			}
+			//else {
+			//	Context.FontAtlas.defaultFonts[i] = *font.SetSize(Context.FontAtlas.fontSize)
+			//}
+		}
+		fmt.Println(Context.FontAtlas.defaultFonts)
 	}
 
 	if ss.disabled {
